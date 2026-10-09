@@ -1,0 +1,69 @@
+name: Publish dashboard and PR previews
+
+on:
+  workflow_run:
+    workflows: [Check and publish Quickdash]
+    types: [completed]
+  pull_request_target:
+    types: [closed]
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: >-
+      github.event_name != 'issue_comment' ||
+      (github.event.issue.pull_request && startsWith(github.event.comment.body, '/deploy '))
+    # Only deployment requests enter the queue; ordinary/bot comments cannot
+    # replace pending deployments. Every publish reconciles all open PRs.
+    concurrency:
+      group: quickdash-pages-publish
+      cancel-in-progress: false
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: write
+      pages: write
+      id-token: write
+      checks: write
+      pull-requests: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      # This privileged workflow only executes default-branch code. PR artifacts
+      # are read as data, including when the completed build came from a fork.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - uses: actions/configure-pages@v6
+        id: pages
+      - name: Assemble production and open PR previews
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          PAGES_BASE_URL: ${{ steps.pages.outputs.base_url }}
+        run: |
+          python3 scripts/pages_preview.py assemble --site "$RUNNER_TEMP/quickdash-pages" \
+            --default-branch "$DEFAULT_BRANCH" --base-url "$PAGES_BASE_URL"
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: ${{ runner.temp }}/quickdash-pages
+      - name: Publish dashboard and previews
+        id: deployment
+        uses: actions/deploy-pages@v5
+      - name: Link deployed previews on PRs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          PAGES_BASE_URL: ${{ steps.pages.outputs.base_url }}
+        run: |
+          python3 scripts/pages_preview.py report --site "$RUNNER_TEMP/quickdash-pages" \
+            --default-branch "$DEFAULT_BRANCH" --base-url "$PAGES_BASE_URL"

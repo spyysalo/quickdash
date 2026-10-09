@@ -4,12 +4,12 @@ A standalone, offline dashboard for comparing model evaluation scores. Explore c
 
 **[Open the dashboard](https://openeurollm.github.io/quickdash/)** or **[try the fictional example](https://openeurollm.github.io/quickdash/demo.html)**. No installation is needed to use either page.
 
-The main page opens with **v1annealC_120k_l0fix** as A and **v2anneal_120k** as B, using the exports in [results/](results/README.md). The earlier v1 run and synthetic comparisons remain selectable. The startup pair is configured in [results/default.yaml](results/default.yaml). The default strict matching excludes results whose few-shot settings differ from the catalogue; review **Warnings**, or explicitly select relaxed matching to include them.
+The main page opens with **v1annealC_120k_l0fix** as A and **v2anneal_120k** as B, using the exports in [results/](results/README.md). Other shared checkpoints, including the merge3 models, and synthetic comparisons remain selectable. The startup pair is configured in [results/default.yaml](results/default.yaml). The default strict matching excludes results whose few-shot settings differ from the catalogue; review **Warnings**, or explicitly select relaxed matching to include them.
 
 ## Compare models
 
 1. Select shared models as A and B, or use **Add model CSV** to open your exports. Three labelled synthetic comparisons (perturbed, higher, and lower scores) are supplied for exploring the interface.
-2. Choose a **Weighting profile**. **Eval set** starts on **flagship-1** to check the expected evals and apply its language exclusions. Select **Any available** to compare shared measurements without requiring that set. Weights and eval sets are independent. The supplied sets exclude prompted Global PIQA pending scoring validation.
+2. Choose a **Weighting profile**. **Eval set** starts on **flagship-1**, using corrected CoT reasoning and code-continuation results with its expected coverage and language exclusions. Missing corrected results show incomplete coverage; original runs remain inspectable. Select **Any available** to compare all recognized shared measurements, which can include both protocols. Weights and eval sets are independent. The supplied sets exclude prompted Global PIQA pending scoring validation.
 3. Review **Warnings**, then explore the scores and breakdowns. The global catalogue determines how to interpret each eval: category, scoring field, normalization, and language assignments.
 
 **Original** is the startup weighting profile. **Code & math emphasis** gives Code and Math 20% each, with the other category weights adjusted as shown in the [configuration reference](docs/configuration.md#choose-weights-and-expected-coverage).
@@ -24,9 +24,9 @@ Files opened here stay in your browser; they are not uploaded or included in lin
 - Edit or add a self-contained eval file in [configs/evals/](configs/evals/), such as [polymath.yaml](configs/evals/polymath.yaml). Each file holds its scoring rules and language assignments together; the catalogue combines them automatically.
 - Add weighting profiles to [configs/weights/](configs/weights/), or optional named eval sets to [configs/sets/](configs/sets/). Each directory has a `default.txt` choosing its startup selection. See [contributing configs](configs/README.md).
 
-Use a pull request or GitHub’s **Add file → Upload files**. Changes on `main` trigger tests and a GitHub Pages rebuild; pull requests are checked without publishing. Invalid inputs stop the update and leave the last successful site online. The repository and dashboard are public, so use browser imports for private comparisons.
+Use a pull request or GitHub’s **Add file → Upload files**. Changes on `main` trigger tests and a GitHub Pages rebuild. PRs authored by a user in [OWNERS](OWNERS) get previews automatically after checks pass. For other authors, the bot supplies a copyable `/deploy <commit-sha>` command that an OWNER can post to approve that commit. Later commits require new approval. Click **Open preview** in the bot comment on the PR conversation; CI updates that same comment with the built commit. The **Pages preview** check and [preview index](https://openeurollm.github.io/quickdash/pr-preview/) also link to it. Previews are removed when the PR closes. The repository, dashboard, and PR previews are public, so use browser imports for private comparisons.
 
-The [Pages workflow](.github/workflows/pages.yml) publishes only the generated dashboard, fictional demo, and licenses. Repository maintainers configure **Settings → Pages → Source → GitHub Actions**. Check the repository’s **Actions** tab if an update fails to appear.
+The [build workflow](.github/workflows/pages.yml) checks and packages the dashboard, fictional demo, and licenses. The [Pages publisher](.github/workflows/publish-pages.yml) combines the main dashboard with previews at `pr-preview/pr-<number>/`. Repository maintainers configure **Settings → Pages → Source → GitHub Actions**. Check the repository’s **Actions** tab if an update fails to appear; see [publishing and previews](docs/development.md#publish-through-github-pages).
 
 ## Build a standalone file
 

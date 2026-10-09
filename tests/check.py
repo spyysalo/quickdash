@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -25,6 +26,46 @@ def find_chrome():
     raise RuntimeError('Chrome is required for the public browser checks. Install Chrome or set CHROME_BIN to its executable.')
 
 
+def stop_browser(browser, grace=10):
+    """Stop profile writers before TemporaryDirectory removes their files."""
+    if os.name != 'posix':
+        browser.terminate()
+        try:
+            browser.wait(timeout=grace)
+        except subprocess.TimeoutExpired:
+            browser.kill()
+            browser.wait(timeout=grace)
+        return
+
+    def running():
+        browser.poll()  # Reap the parent, even while children are still exiting.
+        # killpg(..., 0) also sees zombies. They cannot write to the profile,
+        # and orphaned children must be reaped by the OS, not by this process.
+        processes = subprocess.check_output(['ps', '-eo', 'pgid=,stat='], text=True)
+        return any(int(group) == browser.pid and not state.startswith('Z')
+                   for group, state in (line.split() for line in processes.splitlines()))
+
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        try:
+            os.killpg(browser.pid, sig)
+        except ProcessLookupError:
+            pass
+        except PermissionError:
+            # macOS can report EPERM for a group whose last member is exiting.
+            # A genuinely live, unsignalable group remains a cleanup failure.
+            if running():
+                raise
+        deadline = time.monotonic() + grace
+        while running():
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(.05)
+        else:
+            browser.wait(timeout=grace)
+            return
+    raise RuntimeError('Chrome subprocesses did not exit after SIGKILL.')
+
+
 def run_browser(chrome):
     with tempfile.TemporaryDirectory(prefix='quickdash-check-') as temporary:
         directory = Path(temporary)
@@ -34,7 +75,7 @@ def run_browser(chrome):
                 chrome, '--headless', '--no-sandbox', '--disable-gpu', '--no-first-run',
                 '--no-default-browser-check', '--remote-debugging-port=0',
                 '--user-data-dir=' + str(profile), 'about:blank',
-            ], stdout=log, stderr=subprocess.STDOUT)
+            ], stdout=log, stderr=subprocess.STDOUT, start_new_session=os.name == 'posix')
             try:
                 active_port = profile / 'DevToolsActivePort'
                 deadline = time.monotonic() + 30
@@ -51,12 +92,7 @@ def run_browser(chrome):
                 print(log.read(), file=sys.stderr)
                 raise
             finally:
-                browser.terminate()
-                try:
-                    browser.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    browser.kill()
-                    browser.wait()
+                stop_browser(browser)
 
 
 def main():
@@ -67,7 +103,7 @@ def main():
     # Browser tests invoke python3; use this command's Python environment for builds.
     os.environ['PATH'] = str(Path(sys.executable).parent) + os.pathsep + os.environ.get('PATH', '')
     subprocess.run([sys.executable, '-m', 'unittest', 'tests.test_check',
-                    'tests.test_data', 'tests.test_engines'], cwd=ROOT, check=True)
+                    'tests.test_data', 'tests.test_engines', 'tests.test_pages_preview'], cwd=ROOT, check=True)
     subprocess.run(['node', '--test'] + ['tests/' + name for name in NODE_TESTS], cwd=ROOT, check=True)
     run_browser(chrome)
     print('All public checks passed, including the browser.')

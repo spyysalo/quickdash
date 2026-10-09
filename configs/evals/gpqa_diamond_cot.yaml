@@ -1,0 +1,22 @@
+name: gpqa_diamond_cot
+category: Knowledge
+match:
+  name: gpqa_diamond_cot
+metric: pass@1
+metric_filter: all
+shots: 0
+score:
+  scale: 1
+normalize:
+  min: 0.25
+  max: 1
+  basis: uniform_choice
+  note: CoT pass@1; retain the GPQA Diamond four-choice uniform-guess baseline of 0.25.
+  sources:
+  - https://huggingface.co/datasets/Idavidrein/gpqa
+languages:
+- language: eng_Latn
+  tasks:
+  - gpqa_diamond_cot
+  evidence: https://huggingface.co/datasets/Idavidrein/gpqa
+  note: English benchmark prompt language; protocol task identifier is recorded in the flag-evals-471 export.

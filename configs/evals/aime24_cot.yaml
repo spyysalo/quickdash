@@ -1,0 +1,22 @@
+name: aime24_cot
+category: Reasoning
+match:
+  name: aime24_cot
+metric: pass@1
+metric_filter: all
+shots: 0
+score:
+  scale: 1
+normalize:
+  min: 0
+  max: 1
+  basis: not_applicable
+  note: CoT pass@1; retain the AIME zero floor without a random-integer guessing correction.
+  sources:
+  - https://maa.org/maa-invitational-competitions/
+languages:
+- language: eng_Latn
+  tasks:
+  - aime24_cot
+  evidence: https://maa.org/maa-invitational-competitions/
+  note: English benchmark prompt language; protocol task identifier is recorded in the flag-evals-471 export.

@@ -163,6 +163,38 @@ try{
  assert.equal(await evaluate("document.querySelector('#modelA').value"),'Example B');
  assert.equal(await evaluate("document.querySelector('#modelB').value"),'Alternative A');
  assert.equal(await evaluate("document.querySelector('#cards .score-card:last-child strong').textContent"),'2.50');
+ // Published preview links resolve to their own dashboard; production stays separate.
+ const previewSite=path.join(temporary,'preview-site');
+ execFileSync('python3',['-c',`
+from pathlib import Path
+import sys
+from scripts.pages_preview import reconcile
+from tests.test_pages_preview import Source, archive, pull
+source = Source()
+source.open = [pull(11, title='<script>window.injected=true</script>')]
+source.previews = {11: source.previews[11]}
+source.main['bundle'] = archive(files={'index.html': Path(sys.argv[1]).read_bytes()})
+source.previews[11]['bundle'] = archive(files={'index.html': Path(sys.argv[2]).read_bytes()})
+reconcile(Path(sys.argv[3]), source)
+ `,path.join(shared,'index.html'),path.join(preferred,'index.html'),previewSite],{cwd:root,stdio:'pipe'});
+ await send('Page.navigate',{url:pathToFileURL(path.join(previewSite,'pr-preview/index.html')).href});
+ for(let i=0;i<50;i++){
+  if(await evaluate("document.title==='Quickdash PR previews' && !!document.querySelector('tbody tr')"))break;
+  await new Promise(r=>setTimeout(r,50));
+ }
+ assert.equal(await evaluate('document.title'),'Quickdash PR previews');
+ assert.equal(await evaluate('window.injected===undefined'),true);
+ assert.match(await evaluate('document.body.textContent'),/Current/);
+ const previewLinks=await evaluate("({main:document.querySelector('a[href=\"../index.html\"]').href,pr:document.querySelector('a[href=\"pr-11/index.html\"]').href})");
+ await navigate(previewLinks.pr);
+ assert.equal(await evaluate("document.querySelector('#modelA').value"),'Example B');
+ assert.equal(await evaluate("document.querySelector('#modelB').value"),'Alternative A');
+ assert.equal(await evaluate("document.querySelector('#cards .score-card:last-child strong').textContent"),'2.50');
+ await navigate(previewLinks.main);
+ assert.equal(await evaluate("document.querySelector('#modelA').value"),'Example A');
+ assert.equal(await evaluate("document.querySelector('#modelB').value"),'Example B');
+ assert.equal(await evaluate("document.querySelector('#cards .score-card:last-child strong').textContent"),'-2.50');
+ await navigate(pathToFileURL(path.join(preferred,'index.html')).href);
  assert.ok(await evaluate("[...document.querySelector('#modelA').options].some(o=>o.value==='Example A')"));
  await click('#swap');await click('[data-view=categories]');
  assert.equal(await evaluate("document.querySelector('#modelA').value"),'Alternative A');
@@ -346,6 +378,38 @@ try{
   if(expected===25)assert.match(await evaluate("document.querySelector('#view').textContent"),/Using 5 shots despite expected 25/);
   await change('#matching','strict');
   assert.equal(await evaluate("document.querySelector('#cards').textContent"),strictCards);
+ }
+ // Named sets select a corrected protocol once and never substitute an older run.
+ await navigate(pathToFileURL(path.join(empty,'index.html')).href);
+ const protocolCatalogue={version:1,name:'Protocol fixture',evals:[
+  {name:'Original protocol',category:'Reasoning',match:{name:'protocol'},metric:'accuracy_avg',metric_filter:'',shots:0,score:{scale:1}},
+  {name:'CoT protocol',category:'Reasoning',match:{name:'protocol_cot'},metric:'pass@1',metric_filter:'all',shots:0,score:{scale:1}},
+ ],languages:[{tasks:['protocol','protocol_cot'],scope:'single',language:'eng_Latn'}]};
+ await click('[data-view=config]');await upload('#suiteFile',serializeSuite(shotAvailable),'available.yaml');
+ await upload('#configFile',serializeCatalogue(protocolCatalogue),'protocols.yaml');
+ await upload('#weightsFile',serializeWeightProfile({version:1,name:'Protocol weights',weights:{Reasoning:1}}),'weights.yaml');
+ await upload('#suiteFile',serializeSuite({version:1,name:'Corrected protocol',mode:'fixed',evals:[{name:'CoT protocol'}]}),'corrected.yaml');
+ const protocolRows=['checkpoint,task,metric,filter,n_shot,harness,backend,value',
+  'Protocol A,protocol,accuracy_avg,,0,test,cpu,1','Protocol B,protocol,accuracy_avg,,0,test,cpu,1',
+  'Protocol A,protocol_cot,pass@1,all,0,test,cpu,0.6','Protocol B,protocol_cot,pass@1,all,0,test,cpu,0.4',
+  'Protocol A,protocol_cot,pass@4,all,0,test,cpu,1','Protocol B,protocol_cot,pass@4,all,0,test,cpu,1',
+  'Original only,protocol,accuracy_avg,,0,test,cpu,1'];
+ await upload('#modelFile',protocolRows.join('\n'),'protocols.csv');
+ await change('#modelA','Protocol A');await change('#modelB','Protocol B');
+ assert.equal(await evaluate("document.querySelector('#error').textContent"),'');
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('.score-card strong')].map(e=>e.textContent)"),['60.00','40.00','20.00']);
+ assert.match(await evaluate("document.querySelector('#coverage').textContent"),/Complete.*1\/1 requirements shared/);
+ await click('[data-view=warnings]');assert.match(await evaluate("document.querySelector('#view').textContent"),/Not used.*Original protocol/s);
+ await click('[data-view=config]');
+ assert.ok(await evaluate("document.querySelector('[data-eval=\"Original protocol\"]')!==null"));
+ assert.ok(await evaluate("document.querySelector('[data-eval=\"CoT protocol\"]')!==null"));
+ await change('#modelB','Original only');
+ for(const matching of ['strict','relaxed']){
+  await change('#matching',matching);
+  assert.equal(await evaluate("document.querySelector('#error').textContent"),'');
+  assert.deepEqual(await evaluate("[...document.querySelectorAll('.score-card strong')].map(e=>e.textContent)"),['—','—','—']);
+  assert.match(await evaluate("document.querySelector('#coverage').textContent"),/INCOMPLETE.*0\/1 requirements shared/);
+  await click('[data-view=warnings]');assert.match(await evaluate("document.querySelector('#view').textContent"),/Missing suite data.*CoT protocol.*Original only/s);
  }
  // Real A/B few-shot differences are allowed only through the explicit runtime option.
  await navigate(pathToFileURL(path.join(empty,'index.html')).href);

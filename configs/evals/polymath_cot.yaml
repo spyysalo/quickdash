@@ -1,0 +1,80 @@
+name: polymath_cot
+category: Reasoning
+match:
+  regex: polymath_.+_(?:low|medium|high|top)_cot
+metric: pass@1
+metric_filter: all
+shots: 0
+score:
+  scale: 1
+normalize:
+  min: 0
+  max: 1
+  basis: not_applicable
+  note: CoT pass@1 for generated mathematical answers; no common finite answer space is defined.
+  sources:
+  - https://github.com/QwenLM/PolyMath
+aggregation:
+  components:
+  - name: low
+    match:
+      regex: polymath_.+_low_cot
+    relative_weight: 1
+  - name: medium
+    match:
+      regex: polymath_.+_medium_cot
+    relative_weight: 2
+  - name: high
+    match:
+      regex: polymath_.+_high_cot
+    relative_weight: 4
+  - name: top
+    match:
+      regex: polymath_.+_top_cot
+    relative_weight: 8
+  note: 'PolyMath difficulty-weighted pass@1 combines all four levels within each language: (low + 2 × medium +
+    4 × high + 8 × top) / 15. Exported pass@1 values are unweighted per-level scores. Each CoT level is required;
+    original-protocol rows cannot fill a missing CoT component.'
+  sources:
+  - https://qwen-polymath.github.io/#benchmark-score
+  - https://github.com/QwenLM/PolyMath/blob/main/eval/run_eval.py
+language_defaults:
+  evidence: https://huggingface.co/datasets/Qwen/PolyMath
+  note: Dataset language follows the underlying PolyMath split; the task suffix identifies the CoT protocol.
+languages:
+- language: deu_Latn
+  tasks:
+  - polymath_de_high_cot
+  - polymath_de_low_cot
+  - polymath_de_medium_cot
+  - polymath_de_top_cot
+- language: eng_Latn
+  tasks:
+  - polymath_en_high_cot
+  - polymath_en_low_cot
+  - polymath_en_medium_cot
+  - polymath_en_top_cot
+- language: spa_Latn
+  tasks:
+  - polymath_es_high_cot
+  - polymath_es_low_cot
+  - polymath_es_medium_cot
+  - polymath_es_top_cot
+- language: fra_Latn
+  tasks:
+  - polymath_fr_high_cot
+  - polymath_fr_low_cot
+  - polymath_fr_medium_cot
+  - polymath_fr_top_cot
+- language: ita_Latn
+  tasks:
+  - polymath_it_high_cot
+  - polymath_it_low_cot
+  - polymath_it_medium_cot
+  - polymath_it_top_cot
+- language: por_Latn
+  tasks:
+  - polymath_pt_high_cot
+  - polymath_pt_low_cot
+  - polymath_pt_medium_cot
+  - polymath_pt_top_cot

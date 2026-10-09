@@ -1,0 +1,22 @@
+name: livecodebench_cont
+category: Code
+match:
+  name: livecodebench_cont
+metric: pass@1
+metric_filter: all
+shots: 0
+score:
+  scale: 1
+normalize:
+  min: 0
+  max: 1
+  basis: not_applicable
+  note: Code-continuation pass@1 is graded by executable tests; no random-program baseline is defined.
+  sources:
+  - https://github.com/LiveCodeBench/LiveCodeBench
+languages:
+- language: eng_Latn
+  tasks:
+  - livecodebench_cont
+  evidence: https://github.com/LiveCodeBench/LiveCodeBench
+  note: English benchmark prompt language; protocol task identifier is recorded in the flag-evals-471 export.

@@ -1,0 +1,23 @@
+name: math500_cot
+category: Math
+match:
+  name: math500_cot
+metric: pass@1
+metric_filter: all
+shots: 0
+score:
+  scale: 1
+normalize:
+  min: 0
+  max: 1
+  basis: not_applicable
+  note: CoT pass@1 for generated mathematical answers; retain the MATH500 zero floor because no common finite answer
+    space is defined.
+  sources:
+  - https://huggingface.co/datasets/HuggingFaceH4/MATH-500
+languages:
+- language: eng_Latn
+  tasks:
+  - math500_cot
+  evidence: https://huggingface.co/datasets/HuggingFaceH4/MATH-500
+  note: English benchmark prompt language; protocol task identifier is recorded in the flag-evals-471 export.

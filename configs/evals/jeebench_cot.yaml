@@ -1,0 +1,23 @@
+name: jeebench_cot
+category: Reasoning
+match:
+  name: jeebench_cot
+metric: pass@1
+metric_filter: all
+shots: 0
+score:
+  scale: 1
+normalize:
+  min: 0.1055
+  max: 1
+  note: CoT pass@1; retain the shared JEEBench normalization floor of 0.1055. This is the existing benchmark scoring
+    convention, based on the paper's mixed-format guessing policy for 515 questions, rather than a measured baseline
+    for this prompting protocol.
+  sources:
+  - https://aclanthology.org/2023.emnlp-main.468.pdf#page=5
+languages:
+- language: eng_Latn
+  tasks:
+  - jeebench_cot
+  evidence: https://aclanthology.org/2023.emnlp-main.468.pdf#page=5
+  note: English benchmark prompt language; protocol task identifier is recorded in the flag-evals-471 export.

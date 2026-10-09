@@ -11,6 +11,8 @@ Choose the file to edit based on what you want to change:
 
 Catalogue `metric`, `metric_filter`, and `shots` are defaults. A named set can override these for a whole eval; omitted values inherit. The dashboard can explicitly relax few-shot matching with warnings. Language exclusions use the catalogue’s assignments, including both translation endpoints. Unknown names are configuration errors. See [set configuration and matching](../docs/configuration.md#strict-and-relaxed-matching).
 
+Distinct evaluation protocols use separate catalogue entries, such as [polymath.yaml](evals/polymath.yaml) and [polymath_cot.yaml](evals/polymath_cot.yaml). The default `flagship-1` set selects the corrected CoT and code-continuation entries, without fallback to original runs. `Any available` can include both; use a named set to choose one protocol per benchmark.
+
 Put repeated language `evidence` and `note` under `language_defaults` in the eval file; individual language entries can override either field. Ordinary entries need only a canonical `language` and `tasks`: scope is inferred from the declared language fields. Keep an explicit `scope: pooled` when a pooled result is assigned to a specific language label. See [shared language metadata](../docs/configuration.md#shared-language-metadata).
 
 Each profile or set needs a distinct `name` within its directory. To change a selector's startup choice, edit that directory's `default.txt` to name one YAML file. The catalogue is selected at build time with `--catalogue`, or temporarily loaded in the browser.

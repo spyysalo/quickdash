@@ -3,28 +3,29 @@ name: flagship-1
 mode: fixed
 exclude_languages: [kat_Geor]
 notes:
+  - Use corrected CoT reasoning and code-continuation protocols; original-protocol results are excluded without fallback.
   - Require the catalogue tasks for each listed eval, inheriting its scoring defaults.
   - Exclude Georgian results because of a vocabulary error. Exclude English X-CSQA to avoid overlap with CommonsenseQA.
 evals:
   - name: bigbench_cs_algorithms
-  - name: HumanEval
-  - name: LiveCodeBench
-  - name: mbpp
+  - name: humaneval_cont
+  - name: livecodebench_cont
+  - name: mbpp_cont
   - name: bigbench_dyck_languages
   - name: bigbench_operators
   - name: bigbench_repeat_copy_logic
   - name: gsm8k
   - name: mgsm
-  - name: MATH500
-  - name: AIME24
-  - name: AIME25
-  - name: AMC23
-  - name: JEEBench
+  - name: math500_cot
+  - name: aime24_cot
+  - name: aime25_cot
+  - name: amc23_cot
+  - name: jeebench_cot
   - name: agieval_lsat_ar
-  - name: polymath
+  - name: polymath_cot
   - name: arc_challenge
   - name: arc_easy
-  - name: GPQADiamond
+  - name: gpqa_diamond_cot
   - name: include_base_44
   - name: jeopardy
   - name: mmlu

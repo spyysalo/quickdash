@@ -1,6 +1,6 @@
 name: polymath
 category: Reasoning
-match: {regex: 'polymath_.+'}
+match: {regex: 'polymath_.+_(?:low|medium|high|top)'}
 metric: exact_match
 metric_filter: none
 shots: 0

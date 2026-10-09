@@ -6,7 +6,7 @@ Quickdash separates four inputs: model results, a weighting profile, an optional
 | --- | --- | --- |
 | CSV results | Raw measurements for models A and B | Shared files in `results/`, or browser imports |
 | Weighting profile | Category weights, English shares, default calculation | `configs/weights/oellm.yaml` |
-| Eval set | Optional expected evals and variants | `configs/sets/any-available.yaml` |
+| Eval set | Optional expected evals and variants | `configs/sets/flagship-1.yaml` on dashboard startup |
 | Global catalogue | Match tasks to evals, categories, metrics, normalization and languages | `configs/catalogue.yaml` → `configs/evals/` |
 
 ## Choose weights and expected coverage
@@ -32,6 +32,19 @@ Both profiles default to the standard calculation and store an English share of 
 **Any available** uses recognized selected measurements shared by A and B. Measurements present on only one side generate comparison warnings and are excluded from both scores. Catalogue entries absent from both models do not generate warnings. The supplied freeform set explicitly excludes prompted Global PIQA pending validation; present data for it generates a **Not used** warning.
 
 **flagship-1** requires the catalogue's known tasks for each listed eval, excluding Georgian throughout the set because of a vocabulary error and English specifically for X-CSQA. Original and translated tasks stay under their existing eval group (for example `arc_challenge`). A missing required result generates a warning even if other languages for that eval are present. The score is labelled **INCOMPLETE** and uses the shared subset with redistributed weights. Excluded tasks are not requirements; present excluded data produces **Not used** warnings and remains inspectable.
+
+The set uses the corrected CoT reasoning and code-continuation protocols from the `flag-evals-471` exports. Each has its own catalogue entry, so the original and corrected runs retain distinct task identities:
+
+| Original eval | Selected corrected eval |
+| --- | --- |
+| AIME24, AIME25, AMC23 | `aime24_cot`, `aime25_cot`, `amc23_cot` |
+| GPQADiamond, JEEBench, MATH500 | `gpqa_diamond_cot`, `jeebench_cot`, `math500_cot` |
+| HumanEval, LiveCodeBench, mbpp | `humaneval_cont`, `livecodebench_cont`, `mbpp_cont` |
+| polymath | `polymath_cot` (all four difficulty levels in each of six languages) |
+
+These entries select `pass@1` with filter `all`, at 0 shots except `mbpp_cont` at 3 shots. Alternate metrics such as `pass@4` and `think_closed` remain raw inspection fields. Category assignments, normalization floors, and PolyMath difficulty weights are retained. The inherited JEEBench floor of 0.1055 is a shared scoring convention, not a newly measured baseline for CoT prompting.
+
+`flagship-1` excludes the original entries, avoiding duplicate contributions from the same benchmark. Missing corrected results leave coverage incomplete, even when an original run is present; relaxed matching does not substitute a different task or metric. Original entries remain available for custom sets and inspection. **Any available** can include both original and corrected entries as separate evals, so its score answers a different comparison question.
 
 A named set can be concise:
 
@@ -83,7 +96,7 @@ The dashboard starts with **Strict matching**. Expected settings are resolved in
 
 Relaxed matching never substitutes a different metric or metric filter, or pairs different harnesses/backends. Component groups must still contain every component at one consistent actual shot count. If per-task selection leaves a mixed-shot or incomplete component group, the group is excluded; the engine does not search for a different combination to rescue it.
 
-When a differing shot count actually contributes, the page prominently reports **INCONSISTENT EVALUATION SETTINGS**. Warnings give the eval, model, tasks, expected count, and actual count. Real measurement identities retain their actual settings. Enabling relaxed mode alone does not label a comparison inconsistent if no mismatched measurements contribute. The shipped working expectations are 10 shots for ARC Challenge and PIQA, and 5 for MGSM; their 0-shot translated/global variants need relaxed matching unless the set overrides the expectation.
+When a differing shot count actually contributes, the page prominently reports **INCONSISTENT EVALUATION SETTINGS**. Warnings give the eval, model, tasks, expected count, and actual count. Real measurement identities retain their actual settings. Enabling relaxed mode alone does not label a comparison inconsistent if no mismatched measurements contribute. The shipped working expectations are 25 shots for ARC Challenge, 10 for PIQA, and 5 for MGSM; their 0-shot translated/global variants need relaxed matching unless the set overrides the expectation.
 
 A weighting profile works with either mode:
 
@@ -298,7 +311,7 @@ aggregation:
 
 Each component requires a unique nonempty `name`, a full-task `match` (exact `name` or `regex`, as for eval matching), and a positive finite numeric `relative_weight`. The weight sum must be finite. The list must be nonempty. Optional `note` is text and `sources` is a list of HTTP(S) URLs. Unknown fields are rejected. Multiplying all component weights by the same positive constant leaves the result unchanged.
 
-The supplied PolyMath rule implements the authors' [Difficulty-Weighted Accuracy](https://qwen-polymath.github.io/#benchmark-score): `(low + 2×medium + 4×high + 8×top)/15`. The [oellm-eval template](https://github.com/OpenEuroLLM/oellm-eval/blob/8a4b2412a8e8f7f0d95e3845e2164c792add6a79/oellm/resources/custom_lm_eval_tasks/polymath/_default_template_yaml) emits a mean accuracy for each difficulty split; those input values are not already difficulty-weighted.
+Both supplied PolyMath rules use the authors' [Difficulty-Weighted Accuracy](https://qwen-polymath.github.io/#benchmark-score) formula: `(low + 2×medium + 4×high + 8×top)/15`. The original `polymath` entry selects `exact_match` with filter `none`; the [oellm-eval template](https://github.com/OpenEuroLLM/oellm-eval/blob/8a4b2412a8e8f7f0d95e3845e2164c792add6a79/oellm/resources/custom_lm_eval_tasks/polymath/_default_template_yaml) emits a mean accuracy for each difficulty split. The default set selects `polymath_cot`, whose task and component matches end in `_cot`, with metric `pass@1` and filter `all`. Both take unweighted per-level inputs and require all four levels within a language. Original-protocol rows cannot fill missing CoT levels.
 
 Calculation order:
 

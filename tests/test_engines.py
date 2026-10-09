@@ -887,6 +887,67 @@ class Engines(unittest.TestCase):
             )
         )
 
+    def test_flagship_selects_corrected_protocols_without_legacy_fallback(self):
+        replacements = {
+            "AIME24": "aime24_cot", "AIME25": "aime25_cot", "AMC23": "amc23_cot",
+            "GPQADiamond": "gpqa_diamond_cot", "HumanEval": "humaneval_cont",
+            "JEEBench": "jeebench_cot", "LiveCodeBench": "livecodebench_cont",
+            "MATH500": "math500_cot", "mbpp": "mbpp_cont", "polymath": "polymath_cot",
+        }
+        config = load_config(catalogue=ROOT / "configs/catalogue.yaml",
+                             weights=ROOT / "configs/weights/oellm.yaml",
+                             eval_set=ROOT / "configs/sets/flagship-1.yaml")
+        required = {e["name"]: e for e in config["suite"]["evals"]}
+        self.assertTrue(set(replacements.values()) <= required.keys())
+        self.assertFalse(set(replacements) & required.keys())
+        definitions = {e["name"]: e for e in config["catalogue"]["evals"]}
+        for old_name, new_name in replacements.items():
+            with self.subTest(eval=new_name):
+                old = definitions[old_name]
+                # Scores are invented. Only the protocol selection contract uses shipped rules.
+                if old_name == "polymath":
+                    old_tasks = [t for g in config["catalogue"]["languages"] for t in g["tasks"]
+                                 if re.fullmatch(r"polymath_.+_(low|medium|high|top)", t)]
+                    new_tasks = [t + "_cot" for t in old_tasks]
+                else:
+                    old_tasks, new_tasks = [old["match"]["name"]], [new_name]
+                shots = "3" if new_name == "mbpp_cont" else "0"
+                legacy = [row(t, "1", metric=old["metric"], filter=old["metric_filter"],
+                              n_shot=str(old["shots"])) for t in old_tasks]
+                corrected = [row(t, ".6", metric="pass@1", filter="all", n_shot=shots) for t in new_tasks]
+                alternatives = [row(t, "1", metric=metric, filter=filter_, n_shot=shots)
+                                for t in new_tasks for metric, filter_ in
+                                [("pass@4", "all"), ("think_closed", "all"), ("pass@1", "none")]]
+                subset = {**config, "suite": {**config["suite"], "evals": [required[new_name]]}}
+                complete = dict(config=subset, rows=legacy + corrected + alternatives)
+                missing = dict(config=subset, rows=legacy + alternatives)
+                for outputs in self.both([complete, {**complete, "matching": "relaxed"}]):
+                    for output in outputs:
+                        self.assertNotIn("error", output)
+                        report = output["value"]
+                        measurements = report["models"][0]["measurements"]
+                        included = [m for m in measurements if m["included"]]
+                        self.assertEqual({m["task"] for m in included}, set(new_tasks))
+                        self.assertEqual(len(included), len(new_tasks))
+                        self.assertEqual({(m["metric"], m["filter"], m["n_shot"]) for m in included},
+                                         {("pass@1", "all", shots)})
+                        self.assertTrue(all(not m["included"] for m in measurements if m["task"] in old_tasks))
+                        self.assertNotIn("missing_suite_data", {d["code"] for d in report["diagnostics"]})
+                        self.assertAlmostEqual(sum(m["effective_weight"] for m in included), 1)
+                for outputs in self.both([missing, {**missing, "matching": "relaxed"}]):
+                    for output in outputs:
+                        self.assertNotIn("error", output)
+                        report = output["value"]
+                        self.assertIsNone(report["models"][0]["score"])
+                        self.assertFalse(any(m["included"] for m in report["models"][0]["measurements"]))
+                        self.assertIn("missing_suite_data", {d["code"] for d in report["diagnostics"]})
+                if old_name == "polymath":
+                    incomplete = {**complete, "rows": legacy + [r for r in corrected if not r["task"].endswith("_top_cot")]}
+                    for output in self.both([incomplete])[0]:
+                        self.assertNotIn("error", output)
+                        self.assertIsNone(output["value"]["models"][0]["score"])
+                        self.assertIn("incomplete_components", {d["code"] for d in output["value"]["diagnostics"]})
+
     def test_published_sample_across_all_shipped_configs(self):
         # Discover files so adding a profile or set automatically extends parity coverage.
         rows = parse_csv((ROOT / "examples/sample-evals.csv").read_text())

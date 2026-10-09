@@ -60,19 +60,8 @@ jobs:
       - uses: actions/upload-pages-artifact@v5
         with:
           path: output/site
-
-  deploy:
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs: build
-    runs-on: ubuntu-24.04
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/configure-pages@v6
-      - name: Publish the checked dashboard
-        id: deployment
-        uses: actions/deploy-pages@v5
+          retention-days: 30
+      - name: Explain PR preview publishing
+        if: github.event_name == 'pull_request'
+        run: |
+          echo 'The Pages publisher will reconcile this build after checks complete. A **Pages preview** check links the deployed page from the PR.' >> "$GITHUB_STEP_SUMMARY"

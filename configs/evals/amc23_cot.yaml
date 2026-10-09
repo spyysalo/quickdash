@@ -1,0 +1,22 @@
+name: amc23_cot
+category: Reasoning
+match:
+  name: amc23_cot
+metric: pass@1
+metric_filter: all
+shots: 0
+score:
+  scale: 1
+normalize:
+  min: 0
+  max: 1
+  basis: not_applicable
+  note: CoT pass@1; retain the AMC23 zero floor used for open-ended mathematical answers.
+  sources:
+  - https://maa.org/student-programs/amc/
+languages:
+- language: eng_Latn
+  tasks:
+  - amc23_cot
+  evidence: https://maa.org/student-programs/amc/
+  note: English benchmark prompt language; protocol task identifier is recorded in the flag-evals-471 export.

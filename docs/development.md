@@ -8,7 +8,8 @@ Run commands from the repository root. Install the Python package with `python -
 | --- | --- |
 | `quickdash/` | Native Python interpretation, analysis, diagnostics, and CLI. |
 | `app/` | Python builder, DOM-independent JavaScript engine (`analysis.js`), browser renderer (`app.js`), HTML, and bundled YAML parser. |
-| `tests/` | Public contract tests, browser checks, and optional private-export regressions. |
+| `tests/` | Public contract tests, browser checks, publishing tests, and optional private-export regressions. |
+| `scripts/` | Assemble and report GitHub Pages production and PR preview deployments. |
 | `configs/` | Catalogue manifest, self-contained `evals/` files, weighting profiles, optional named sets, and fictional examples. |
 | `results/` | Public CSV exports contributed to the shared dashboard. |
 | `examples/` | Public sample export for Pages and parity tests, plus small fictional quickstart data. |
@@ -108,8 +109,38 @@ This optional check compares included rows, weights, contributions, scores and d
 
 The [workflow](../.github/workflows/pages.yml) runs public tests on pull requests and pushes to `main`. The Python loader and Node filesystem helper both assemble the per-eval files declared by `configs/catalogue.yaml`. Shared tests check assembly, language ownership, file loading, and portable export/import as well as scoring.
 
-After tests pass, it builds the shared dashboard and a separate fictional demo. When `results/` has no CSVs, the shared page embeds `examples/sample-evals.csv`; real shared CSVs take precedence. The sample also runs through both engines in CI for all shipped weighting profiles, eval sets, and aggregation modes, with complete and mismatched coverage. See [contributor requirements](../AGENTS.md). Only `output/site/` is uploaded as the Pages artifact: `index.html`, `demo.html`, and license files. The repository root and private local output are not published as the site.
+After tests pass, it builds the shared dashboard and a separate fictional demo. When `results/` has no CSVs, the shared page embeds `examples/sample-evals.csv`; real shared CSVs take precedence. The sample also runs through both engines in CI for all shipped weighting profiles, eval sets, and aggregation modes, with complete and mismatched coverage. See [contributor requirements](../AGENTS.md). Only `output/site/` is uploaded as the build artifact: `index.html`, `demo.html`, and license files. Build artifacts are retained for 30 days. The repository root and private local output are not published as the site.
 
-In repository **Settings → Pages**, select **GitHub Actions** as the source. Publishing uses the generated artifact rather than a checked-in root or `docs/` folder. A successful push to `main` deploys automatically; a failed build leaves the last successful site available. Review build or deployment failures in the repository’s **Actions** tab.
+In repository **Settings → Pages**, select **GitHub Actions** as the source. Keep the `github-pages` environment restricted to `main`. The [publisher workflow](../.github/workflows/publish-pages.yml) runs after build completions, when a PR closes, on `/deploy <commit-sha>` PR comments, or through **Run workflow**. It executes the publisher script from the default branch and uses successful build artifacts as static data. It never checks out or executes PR code with publishing permissions, including for fork PRs. The build workflow keeps read-only repository access.
+
+[OWNERS](../OWNERS) lists GitHub logins trusted to auto-deploy their PRs and approve other authors' previews. The initial owners are `jonabur` and `spyysalo`. The publisher reads OWNERS from its trusted default-branch checkout; changes to OWNERS within a PR cannot grant that PR access. Logins are case-insensitive, one per line, with optional `#` comments. An empty or malformed list fails publishing.
+
+For another author, the bot explains why it did not auto-deploy and includes a complete `/deploy <40-character-commit-sha>` command in a code block. An OWNER can copy it into a new comment; no manual hash entry is needed. Only a standalone command written by a current OWNER and matching the exact commit grants approval. Bare `/deploy`, partial hashes, quoted commands, and commands from non-owners do not grant access. Successful checks are still required. When that commit is deployed, the bot adds a rocket reaction to the owner's command. Reactions alone do not approve deployment: GitHub Actions has no reaction-created trigger.
+
+Approval is read from PR comments on every reconciliation, so coalesced workflow events cannot lose a command. A new push needs a new approval. A previously approved preview can stay available while the new head awaits approval; the comment labels the older build. Removing an owner or deleting their approval revokes access on the next reconciliation, including previously deployed content that no longer has valid authorization. Use **Run workflow** to apply a revocation immediately. Ordinary comments do not enter the deployment concurrency queue.
+
+The publisher deploys one combined site:
+
+- `/quickdash/` serves the latest successful main build.
+- `/quickdash/pr-preview/pr-<number>/` serves that PR’s latest published successful build.
+- `/quickdash/pr-preview/` lists open PRs, preview links, and the exact built commits. It labels a retained preview as **Previous successful build** when the current PR head has no successful build yet.
+
+After deployment succeeds, the publisher creates or updates one bot comment in each PR conversation with a prominent **Open preview** link and the built commit, or the owner-approval instructions when deployment is blocked. It reuses the comment without writing when the text is unchanged, and only edits comments owned by `github-actions[bot]` with the publisher’s hidden marker. A preview from an older successful build is labelled explicitly. Closing or merging a PR removes its directory and changes its existing comment to **Preview closed** after deployment succeeds; pending comment cleanup persists across failed deployments and retries. Reopening the PR lets the next successful deployment reuse the comment.
+
+A **Pages preview** check on each current authorized, built PR commit also includes an **Open preview** link in its summary. A failed main build preserves production; a failed PR build preserves its previous authorized preview. Review both the ordinary `build` check and the built commit before assessing a preview. Previews are public and share the Pages origin with the main dashboard. Authorizing a preview means trusting its browser code: read-only data does not stop JavaScript from misleading users or reading same-origin browser storage and files a user imports into that page. The authorization gate is not a browser sandbox. The trusted publisher has `pull-requests: write` for comments and acknowledgment reactions; PR build jobs retain read-only permissions.
+
+Generated files and their source run/commit identifiers persist on the `pages-content` branch, created automatically by the first publisher run. This is storage for the Actions publisher; **do not change Pages to deploy from this branch**. The stored files keep published previews available after their source artifacts expire. Every publisher run reconciles all open PRs and successful main builds, and publishing is serialized so concurrent builds cannot overwrite each other’s previews. Run **Publish dashboard and PR previews** manually to retry a failed deployment or reconcile missed updates. The workflow must be on `main` before automatic previews can run; existing successful artifacts can be picked up during that first deployment.
+
+Only the four expected regular files are accepted from each build artifact, with a 100 MiB limit on each archive layer and its total file content. Unexpected paths, duplicate files, links, and malformed archives are rejected without extracting their paths. Invalid PR artifacts do not prevent production or other previews from publishing. Hidden Git/state files are excluded from the final Pages artifact.
+
+To rehearse assembly with current GitHub artifacts, without pushing a branch, deploying Pages, or writing PR checks:
+
+```sh
+python3 scripts/pages_preview.py inspect --repository OpenEuroLLM/quickdash \
+  --site output/preview-rehearsal --base-url https://openeurollm.github.io/quickdash
+open output/preview-rehearsal/pr-preview/index.html
+```
+
+This requires an authenticated GitHub CLI (`gh`). The publisher uses Python’s standard library and `gh`; no package installation is required. `python3 -m tests.check` includes archive validation, snapshot updates, fork build identification, stale-build handling, cleanup, and preview-check regression tests. Review build or deployment failures in the repository’s **Actions** tab.
 
 Before pushing, run the affected tests and check the README, config reference, and contribution instructions for changed commands or behavior. Contributions to [results](../results/README.md) and [configs](../configs/README.md) are validated by the same workflow.
